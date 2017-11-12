@@ -3,22 +3,24 @@ import os
 import numpy as np
 from scipy.spatial import distance
 import random
+import time
 
 def filters(img):
     black_bool = True
     white_bool = False
-	
+
     G = img.copy()
     gpA = [G]
     for i in range(4):
         G = cv2.pyrDown(G)
         gpA.append(G)
-		
+
     img = gpA[2]
     h, w = img.shape
+    #cv2.imshow('img', img)
 
     filter_0 = np.ones((h, w), bool)
-	
+
     filter_1 = np.ones((h, w), bool)
     filter_1[0:h, 0:int(w / 2)] = white_bool
 
@@ -62,17 +64,18 @@ def filters(img):
     filters = [filter_0, filter_1, filter_2, filter_3, filter_4, filter_5,
                filter_6, filter_7, filter_8, filter_9, filter_10, filter_11,
                filter_12, filter_13, filter_14, filter_15]
-    
-	filtet_number = 0
+    filtet_number = 0
     full_res = []
     for filter in filters:
         res = 0
         for i in range(h):
             for j in range(w):
                 if filter[i][j] == black_bool:
-                    res += img[i][j]
+                    res += 255-img[i][j]
+                    #print('+ ' + str(i) + ' ' + str(j))
                 elif filter[i][j] == white_bool:
-                    res -= img[i][j]
+                    res -= 255-img[i][j]
+                    #print('- ' + str(i) + ' ' + str(j))
         #print('filter ' + str(filtet_number) + ' = ' + str(res))
         filtet_number += 1
         full_res.append(res)
@@ -86,6 +89,7 @@ def create_sign():
     for img in images:
         folder = 'C:/Users/Natali/Documents/letters_256/'
         img_input = cv2.imread(os.path.join(folder,img))
+        #img_input = cv2.resize(img_input, (56, 56), cv2.INTER_AREA)
         print(os.path.join(folder,img))
         h, w, c = img_input.shape
         f = open('sign2lvl40.txt', 'a')
@@ -127,23 +131,43 @@ def sp_noise(image,prob):
 
 #create_sign()
 sign = sign_to_list()
-im = cv2.imread('C:/Users/Natali/Documents/test8-2.png')
+im = cv2.imread('C:/Users/Natali/Documents/test2.png')
 im = sp_noise(im, 0)
+start = time.clock()
 im_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 im_gray_blur = cv2.GaussianBlur(im_gray, (5, 5), 0)
 
+# Threshold the image
 ret, im_th = cv2.threshold(im_gray_blur, 160, 255, cv2.THRESH_BINARY_INV)
+
+# Find contours in the image
 _, ctrs, hier = cv2.findContours(im_th.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+#cv2.drawContours(im, ctrs, -1, (0,0,255), 2)
+
+#cv2.imshow('im_th', im_th)
+#cv2.waitKey(0)
+
 rects = [cv2.boundingRect(ctr) for ctr in ctrs]
 count_letter = 0
 
 for rect in rects:
+    #print(rect)
     if (rect[3] < 20 or rect[2] < 20):
         continue
+    #cv2.rectangle(im, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 0, 255), 2)
     im2 = im_gray[rect[1]:rect[1] + rect[3], rect[0]:rect[0] + rect[2]]
+    #cv2.imshow('123', im2)
+    #cv2.waitKey(0)
+
+    #im2 = cv2.GaussianBlur(im2, (5, 5), 0)
+    #im2 = cv2.blur(im2, (5, 5))
+    #im2 = cv2.medianBlur(im2, 3)
+    im2 = cv2.medianBlur(im2, 5)
     im2 = cv2.equalizeHist(im2)
-    im2 = cv2.medianBlur(im2, 3)
+    #im2 = cv2.GaussianBlur(im2, (3, 3), 0)
     im2 = cv2.resize(im2, (40, 40), cv2.INTER_AREA)
+    im2 = cv2.medianBlur(im2, 3)
 
     res = filters(im2)
     res = np.asarray(res)
@@ -151,6 +175,7 @@ for rect in rects:
     for i in range(len(sign)):
         sign[i] = np.asarray(sign[i])
         res_coef.append(distance.euclidean(sign[i], res))
+    #print(res_coef)
 
     letters = ['A', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й',
                'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф',
@@ -159,12 +184,20 @@ for rect in rects:
                'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф',
                'х', 'ц', 'ч', 'ш', 'щ', 'ъ', 'ы', 'ь', 'э', 'ю', 'я']
     ind_min = np.argmin(res_coef)
+    #cv2.imshow('123', im2)
 
-    if letters[ind_min] == 'Д' or letters[ind_min] == 'д':
+    #print(letters[ind_min])
+    #cv2.waitKey(0)
+
+    if letters[ind_min] == 'Р' or letters[ind_min] == 'р':
         cv2.rectangle(im, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 0, 255), 2)
         count_letter += 1
+        #print(letters[ind_min], res_coef[4], res_coef[37], res_coef[12], res_coef[45])
 
+comma = 5
+elapsed = round((time.clock() - start), comma)
 cv2.imshow('123', im)
 print(count_letter)
 
+print ("Затрачено " + str(elapsed) + " s")
 cv2.waitKey(0)
